@@ -54,10 +54,6 @@ def calc_l(state_list, remove_loops=False, removal_correction=False):
             expected = sum(orig_next == b) / (len(orig_next) - sum(orig_next == a))
         else:
             expected = np.mean(seq_next)
-        # print(a, b, 'observed', observed)
-        print(a, b, 'orig_next == b', sum(orig_next == b))
-        print(a, b, 'len(orig_next) - sum(orig_next == a)', len(orig_next) - sum(orig_next == a))
-        print(a, b, 'expected', expected)
         result[a][b] = (observed - expected) / (1 - expected) if expected < 1 else np.nan
     return result
 
