@@ -2,7 +2,7 @@
 # transition metrics. It should be easy to modify should you wish to try different sequence lengths,
 # numbers of states, etc.
 #
-# The self_transition_removal() function requires Graphviz to be installed so that "dot" can be run.
+# The loop_removal() function requires Graphviz to be installed so that "dot" can be run.
 
 from subprocess import call
 
@@ -14,9 +14,9 @@ import matplotlib.pyplot as plt
 import transition_metrics
 
 
-SIMULATIONS = 10000
+SIMULATIONS = 10000  # Takes a couple hours to run everything
 plt.style.use('nigel.mplstyle')
-np.random.seed(11798)
+np.random.seed(11798)  # Catch 22
 
 
 def simulate(seq_len, base_rates, remove_loops, verbose=True):
@@ -30,7 +30,7 @@ def simulate(seq_len, base_rates, remove_loops, verbose=True):
 
     Returns:
         tuple: ({metric name: {state a: {state b: list of metric values}}},
-                {state name: base rate after any self-transition removal})
+                {state name: base rate after any loop removal})
     """
     pool = np.concatenate([[s] * int(f * 1000) for s, f in base_rates.items()])
     result = {}
@@ -156,7 +156,8 @@ def maxmin_vs_seqlen(min_seq_len=5, max_seq_len=25, state_counts=[2, 4]):
         plt.close()
 
 
-def self_transition_removal(seq_len=100):
+def loop_removal(seq_len=100):
+    # Graph the effect of loop removal for various metrics
     base_rates = {'S1:': .25, 'S2:': .25, 'S3:': .50}
     res, pbr = simulate(seq_len, base_rates, remove_loops=True)
     for metric in res:
@@ -172,7 +173,7 @@ def self_transition_removal(seq_len=100):
         call(['dot', 'graphs/tmp.dot', '-Tpng', '-Gdpi=300', '-o',
               'graphs/states_self_removed_' + metric + '.png'])
 
-    # Without self-transition removal
+    # Without loop removal
     base_rates = {'S1: 25%': .25, 'S2: 25%': .25, 'S3: 50%': .50}
     res, _ = simulate(seq_len, base_rates, remove_loops=False)
     for metric in res:
@@ -186,4 +187,4 @@ def self_transition_removal(seq_len=100):
 if __name__ == '__main__':
     nans_vs_seqlen()
     maxmin_vs_seqlen(max_seq_len=100)
-    self_transition_removal()
+    loop_removal()
