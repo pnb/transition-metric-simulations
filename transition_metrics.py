@@ -1,6 +1,8 @@
 # Functions to calculate various state transition metrics. This file is stand-alone and has few
 # dependencies, so it should be straightforward to include in other projects.
 import sys
+import argparse
+
 import numpy as np
 
 
@@ -214,14 +216,75 @@ def transitions_to_dot(transition_map, abs_min_cutoff=0.):
 
 
 if __name__ == '__main__':
-    # Testing examples
-    print(calc_l([1, 1, 2, 2]))
-    print(calc_l([1, 1, 2, 2, 1, 3, 2, 2], remove_loops=True))
-    print(calc_l([1, 2, 2, 3, 2, 1, 2, 2, 3, 1, 2, 3, 2, 3, 1, 2], remove_loops=True))
-    print(calc_lsa([1, 1, 2, 2]))
-    print(calc_phi([1, 1, 2, 2]))
-    print(calc_phi([1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]))
-    print(calc_yules_q([1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]))
-    print(calc_mcm([1, 2, 1, 1]))
-    print(calc_phi([1, 2, 1, 1, 1, 1, 1, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2]))
-    print(calc_kappa([1, 2, 1, 1, 1, 1, 1, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2]))
+    argparser = argparse.ArgumentParser(
+        description='Compute state transition metrics from sequences of observations.')
+    argparser.add_argument('input_filename', type=str,
+                           help='Filename of a CSV file with either one or two columns, each of'
+                           ' which must have a header. If only one column is present, it will be'
+                           ' treated as a sequence of states. If two columns are present, the first'
+                           ' will be treated as a subject-level identifier, and the second will be'
+                           ' treated as a sequence of states.')
+    argparser.add_argument('output_filename', type=str,
+                           help='Output will be written in CSV format to this file. The file will'
+                           ' be overwritten if it already exists.')
+    args = argparser.parse_args()
+
+    print('Reading input file')
+    data = {}  # subject ID -> sequence data
+    with open(args.input_filename, 'r', encoding='utf-8') as incsv:
+        # Check file format
+        header = incsv.readline().strip()
+        sep = ','
+        if '\t' in header:
+            sep = '\t'
+            print('Found a tab in the first row; assuming tab-delimited instead of comma-delimited')
+        header = header.split(sep)
+        assert len(header) <= 2, 'Input file must have 1 or 2 columns; found ' + str(len(header))
+        if len(header) == 2:
+            print('Found two columns;', header[0], 'is a subject ID and', header[1],
+                  'is the sequence data')
+        
+        # Read in data
+        last_pid = 'no_subject_id'
+        for line_i, line in enumerate(incsv):
+            line = line.strip().split(sep)
+            assert len(line) == len(header), 'Number of columns in input file line ' + \
+                str(line_i + 2) + ' did not match header'
+            assert all([v != '' for v in line]), 'Input line ' + str(line_i + 2) + \
+                ' has missing values, which are not supported'
+            if len(line) == 2:
+                if line[0] not in data:
+                    data[line[0]] = []
+                    last_pid = line[0]
+                else:
+                    assert line[0] == last_pid, 'Data for each subject ID must be consecutive' + \
+                        ' in the input file. If there are multiple trials per subject, consider' + \
+                        ' appending a trial ID to the subject ID.'
+            if last_pid == 'no_subject_id' and last_pid not in data:
+                data[last_pid] = []
+            data[last_pid].append(line[-1])
+
+    # Process each subject's sequence individually
+    print('Calculating transition metrics and writing output')
+    possible_states = set()
+    for pid in data:
+        possible_states.update(data[pid])
+    possible_states = sorted(possible_states)
+    with open(args.output_filename, 'w') as outfile:
+        outfile.write('subject_id,n,transition_from,transition_to,cohen_kappa,l,lambda,'
+                      'lambda_no_loops,lsa,mcm,phi,yule_q\n')
+        for pid in data:
+            results = [calc_kappa(data[pid]),
+                       calc_l(data[pid]),
+                       calc_lambda(data[pid]),
+                       calc_lambda(data[pid], remove_loops=True),
+                       calc_lsa(data[pid]),
+                       calc_mcm(data[pid]),
+                       calc_phi(data[pid]),
+                       calc_yules_q(data[pid])]
+            for a in possible_states:
+                for b in possible_states:
+                    outfile.write(pid + ',' + str(len(data[pid])) + ',' + a + ',' + b + ',' +
+                                  ','.join([str(r[a][b]) if a in r and b in r[a] else ''
+                                            for r in results]) + '\n')
+    print('Finished')
