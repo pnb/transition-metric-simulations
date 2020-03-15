@@ -1,8 +1,8 @@
-# transition-metric-simulations
+# Transition metric simulations
 
-## Python scripts for calculating transition probabilities and other measures of sequential association
+This software consists of Python scripts for calculating transition probabilities and other measures of sequential association, and simulation software to explore the properties of these measures by generating different types of sequences.
 
-This software is intended for research on sequential patterns of discrete states. For example, in behavioral research these states may be actions, emotions, or others. Measures of how likely one state is to follow another are often referred to as _transition metrics_. The functions in these scripts provide methods for:
+This software is intended for research on sequential patterns of discrete states. For example, in behavioral research these states may be sequences of students' actions in a learning environment, their emotions, or other states. Measures of how likely one state is to follow another are often referred to as _transition metrics_. The functions in these scripts provide methods for:
 
 1. Quantifying the propensity of one state to follow another (calculating transition metrics)
 2. Simulating sequences with random states to study the properties of transition metrics and to aid in research study design (e.g., by deciding how much data to collect)
