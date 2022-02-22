@@ -9,12 +9,12 @@ import numpy as np
 assert 1 / 2 > 0, 'This script only works with Python 3'
 
 
-def _iterate_state_pairs(state_list, remove_loops=False):
+def _iterate_state_pairs(state_list, remove_loops=False, lag=1):
     state_list = np.array(state_list)
     if remove_loops:
         state_list = get_without_loops(state_list)
-    seq_prev = state_list[:-1]
-    seq_next = state_list[1:]
+    seq_prev = state_list[:-lag]
+    seq_next = state_list[lag:]
     for a in np.unique(state_list):
         arr1 = seq_prev == a
         for b in np.unique(state_list):
@@ -53,7 +53,7 @@ def calc_l(state_list, remove_loops=False, removal_correction=False):
             observed = np.nan
         if remove_loops and removal_correction:
             # Base rate of next state in original data after removing cur state.
-            expected = sum(orig_next == b) / (len(orig_next) - sum(orig_next == a))
+            expected = (orig_next == b).sum() / (len(orig_next) - (orig_next == a).sum())
         else:
             expected = np.mean(seq_next)
         result[a][b] = (observed - expected) / (1 - expected) if expected < 1 else np.nan
@@ -92,12 +92,14 @@ def calc_phi(state_list, remove_loops=False):
     return result
 
 
-def calc_lsa(state_list, remove_loops=False):
+def calc_lsa(state_list, remove_loops=False, lag=1):
     """Calculate z-scores of transition likelihoods, often referred to as Lag Sequential Analysis.
 
     Args:
         state_list (iterable): State sequence of any hashable type (e.g., list of strings)
         remove_loops (bool, optional): Remove loops (state persistence)
+        lag (int, default=1): Number of sequence steps to consider for each transition; lag=1
+            indicates consecutive, lag=5 skips over 4 states between "consecutive" states, etc.
 
     Returns:
         dict: Mapping of {state A: {state B: transition z-score}} for all state pairs
@@ -117,7 +119,7 @@ def calc_lsa(state_list, remove_loops=False):
     #   Xi+ is count of transitions FROM i
     #   X+j is count of transitions TO j
     z = {a: {} for a in np.unique(state_list)}
-    for i, j, seq_prev, seq_next in _iterate_state_pairs(state_list, remove_loops):
+    for i, j, seq_prev, seq_next in _iterate_state_pairs(state_list, remove_loops, lag):
         N = len(seq_prev)
         N = N if N > 0 else np.nan
         oij = sum(seq_prev & seq_next)
@@ -243,7 +245,7 @@ if __name__ == '__main__':
         if len(header) == 2:
             print('Found two columns;', header[0], 'is a subject ID and', header[1],
                   'is the sequence data')
-        
+
         # Read in data
         last_pid = 'no_subject_id'
         for line_i, line in enumerate(incsv):

@@ -3,12 +3,10 @@
 # numbers of states, etc.
 #
 # The loop_removal() function requires Graphviz to be installed so that "dot" can be run.
-
 from subprocess import call
 
 import numpy as np
-import matplotlib
-matplotlib.use('agg')  # Allow graphing without an X server.
+from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 import transition_metrics
@@ -35,17 +33,16 @@ def simulate(seq_len, base_rates, remove_loops, verbose=True):
     pool = np.concatenate([[s] * int(f * 1000) for s, f in base_rates.items()])
     result = {}
     post_base_rates = {s: [] for s in base_rates} if remove_loops else base_rates
-    for sim_i in range(SIMULATIONS):
-        if verbose and (sim_i % 100 == 0 or sim_i == SIMULATIONS - 1):
-            print('Simulating: %.0f%%' % (sim_i / SIMULATIONS * 100), end='\r')
+    for sim_i in tqdm(range(SIMULATIONS), desc='  Simulating', disable=not verbose):
         seq = np.random.choice(pool, seq_len)
         for metric_name, metric_values in [
                 ('MCM', transition_metrics.calc_mcm(seq, remove_loops)),
                 ('L', transition_metrics.calc_l(seq, remove_loops, False)),
                 ('Lambda', transition_metrics.calc_l(seq, remove_loops, True)),
-                ('Phi', transition_metrics.calc_phi(seq, remove_loops)),
+                # ('Phi', transition_metrics.calc_phi(seq, remove_loops)),
                 ('LSA', transition_metrics.calc_lsa(seq, remove_loops)),
-                ('Kappa', transition_metrics.calc_kappa(seq, remove_loops)),
+                ('LSA-5', transition_metrics.calc_lsa(seq, remove_loops, 5)),
+                # ('Kappa', transition_metrics.calc_kappa(seq, remove_loops)),
                 ('Q', transition_metrics.calc_yules_q(seq, remove_loops))]:
             if metric_name not in result:
                 result[metric_name] = {a: {b: [] for b in base_rates} for a in base_rates}
@@ -83,17 +80,22 @@ def nans_vs_seqlen(min_seq_len=5, max_seq_len=25, state_counts=[2, 4]):
                 nanprop[metric].append(np.mean(props))
 
         line_options = {
-            'Kappa': {},
+            # 'Kappa': {},
             'L': {'linewidth': 4},
             'LSA': {'linewidth': 6},
             'MCM': {'linestyle': '--'},
-            'Phi': {'linewidth': 3, 'linestyle': '--'},
+            # 'Phi': {'linewidth': 3, 'linestyle': '--'},
             'Q': {},
+            'LSA-5': {},
         }
         plt.figure(figsize=[6, 4.5])
         for metric in sorted(nanprop.keys()):
-            plt.plot(range(min_seq_len, max_seq_len + 1), nanprop[metric], label=metric,
-                     **line_options[metric])
+            if metric == 'LSA-5':
+                plt.plot(range(min_seq_len + 5, max_seq_len + 1), nanprop[metric][5:], label=metric,
+                         **line_options[metric])
+            else:
+                plt.plot(range(min_seq_len, max_seq_len + 1), nanprop[metric], label=metric,
+                         **line_options[metric])
         plt.xticks(range(min_seq_len, max_seq_len + 1, 5))
         plt.xlabel('Sequence length')
         plt.ylabel('Prop. invalid values')
@@ -163,8 +165,8 @@ def loop_removal(seq_len=100):
     for metric in res:
         print('Creating state transition diagram for ' + metric)
         # Relabel states with post-transition-removal base rate (PBR)
-        for a in res[metric]:
-            for b in res[metric][a]:
+        for a in list(res[metric]):
+            for b in list(res[metric][a]):
                 res[metric][a][b + ' %.0f%%' % (100 * pbr[b])] = res[metric][a].pop(b)
             res[metric][a + ' %.0f%%' % (100 * pbr[a])] = res[metric].pop(a)
         # Save graph
@@ -185,6 +187,8 @@ def loop_removal(seq_len=100):
 
 
 if __name__ == '__main__':
+    # loop_removal()
     nans_vs_seqlen()
     maxmin_vs_seqlen(max_seq_len=100)
-    loop_removal()
+    maxmin_vs_seqlen(max_seq_len=100, state_counts=[7])  # Match Baker et al. 2007
+    nans_vs_seqlen(max_seq_len=50, state_counts=[7])
